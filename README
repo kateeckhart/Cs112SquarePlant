@@ -1,0 +1,10 @@
+This program takes a list of plants and retunes a png file of the packing.
+
+Usage
+./SquarePlant inputfile -o output.png
+
+Build commands
+mkdir Build
+cd Build
+cmake ..
+make
