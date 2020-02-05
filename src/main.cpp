@@ -217,7 +217,6 @@ png_byte** genImage(const std::vector<SquarePlant::Box>& boxes, int& width, int&
         }
     }
 
-
     return rows;
 }
 
@@ -256,22 +255,25 @@ int main(int argc, char **argv) {
 
     png_init_io(png, outputFile);
 
+    int width, height;
+    png_byte** rows = genImage(boxes, width, height);
+
     if(setjmp(png_jmpbuf(png))) {
         png_destroy_write_struct(&png, &info);
         fclose(outputFile);
+        for (int i = 0; i < height; i++) {
+            delete[] rows[i];
+        }
+        delete rows;
         std::cerr << "Error while writing header" << std::endl;
         return 1;
     }
-
-    int width, height;
-    png_byte** rows = genImage(boxes, width, height);
 
     png_set_IHDR(png, info, width, height, 8, 
             PNG_COLOR_TYPE_RGB, PNG_INTERLACE_NONE, 
             PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
 
     png_write_info(png, info);
-
 
     if (setjmp(png_jmpbuf(png))) {
         png_destroy_write_struct(&png, &info);
