@@ -1,6 +1,8 @@
 #ifndef SQUARE_PLANT_PLANT_H
 #define SQUARE_PLANT_PLANT_H
 
+#include <array>
+#include <cstdint>
 #include <string>
 #include <memory>
 
@@ -10,6 +12,7 @@ class AbstractPlant {
 public:
     virtual int getSize() const = 0;
     virtual std::string getName() const = 0;
+    virtual std::array<uint8_t, 3> getColor() const = 0;
     virtual std::unique_ptr<AbstractPlant> plantCopy() const = 0;
     virtual ~AbstractPlant() = default;
 };
@@ -27,6 +30,10 @@ public:
         return 1;
     }
 
+    std::array<uint8_t, 3> getColor() const {
+        return {161, 71, 43};
+    }
+
     std::string getName() const override {
         return "Onion";
     }
@@ -36,6 +43,10 @@ class GrapeVine : public Plant<GrapeVine> {
 public:
     int getSize() const override {
         return 2;
+    }
+
+    std::array<uint8_t, 3> getColor() const {
+        return {87, 16, 107};
     }
 
     std::string getName() const override {
@@ -49,6 +60,10 @@ public:
         return 3;
     }
 
+    std::array<uint8_t, 3> getColor() const {
+        return {230, 152, 18};
+    }
+
     std::string getName() const override {
         return "Orange Tree";
     }
@@ -58,6 +73,10 @@ class AppleTree : public Plant<AppleTree> {
 public:
     int getSize() const override {
         return 4;
+    }
+
+    std::array<uint8_t, 3> getColor() const {
+        return {230, 18, 18};
     }
 
     std::string getName() const override {

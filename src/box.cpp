@@ -5,7 +5,11 @@
 
 namespace SquarePlant {
 
-Box::Box(std::vector<std::unique_ptr<AbstractPlant>> inPlants) : plants(std::move(inPlants)) {
+Box::Box(std::array<std::array<std::unique_ptr<AbstractPlant>, 4>, 4> inPlants) : plants(std::move(inPlants)) {
+}
+
+const std::array<std::array<std::unique_ptr<AbstractPlant>, 4>, 4>& Box::getPlants() const {
+    return plants;
 }
 
 std::vector<Box> Box::packPlants(std::vector<std::unique_ptr<AbstractPlant>> plants) {
@@ -19,48 +23,83 @@ std::vector<Box> Box::packPlants(std::vector<std::unique_ptr<AbstractPlant>> pla
     }
 
     for (auto&& plant: plantsBySize[3]) {
-        std::vector<std::unique_ptr<AbstractPlant>> newBox;
-        newBox.push_back(std::move(plant));
+        std::array<std::array<std::unique_ptr<AbstractPlant>, 4>, 4> newBox;
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < 4; j++) {
+                newBox[i][j] = plant->plantCopy();
+            }
+        }
         ret.push_back(Box(std::move(newBox)));
     }
 
     for (auto&& plant: plantsBySize[2]) {
-        std::vector<std::unique_ptr<AbstractPlant>> newBox;
-        newBox.push_back(std::move(plant));
-        for (int i = 0; i < 7; i++) {
+        std::array<std::array<std::unique_ptr<AbstractPlant>, 4>, 4> newBox;
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++) {
+                newBox[i][j] = plant->plantCopy();
+            }
+        }       
+        for (int i = 0; i < 3; i++) {
             if (plantsBySize[0].empty()) break;
 
-            newBox.push_back(std::move(plantsBySize[0].back()));
+            newBox[i][3] = std::move(plantsBySize[0].back());
+            plantsBySize[0].pop_back();
+        }
+        for (int i = 0; i < 4; i++) {
+            if (plantsBySize[0].empty()) break;
+
+            newBox[3][i] = std::move(plantsBySize[0].back());
             plantsBySize[0].pop_back();
         }
         ret.push_back(Box(std::move(newBox)));
     }
 
     while (!plantsBySize[1].empty()) {
-        std::vector<std::unique_ptr<AbstractPlant>> newBox;
-        int remainingTwoXTwo = 4;
-        while (remainingTwoXTwo > 0 && !plantsBySize[1].empty()) {
-            newBox.push_back(std::move(plantsBySize[1].back()));
+        std::array<std::array<std::unique_ptr<AbstractPlant>, 4>, 4> newBox;
+        int collum = 0;
+        int row = 0;
+        while (row < 4 && !plantsBySize[1].empty()) {
+            for (int i = collum; i < collum + 2; i++) {
+                for (int j = row; j < row + 2; j++) {
+                    newBox[i][j] = plantsBySize[1].back()->plantCopy();
+                }
+            }
             plantsBySize[1].pop_back();
-            remainingTwoXTwo--;
+            collum += 2;
+            if (collum == 4) {
+                collum = 0;
+                row += 2;
+            }
         }
-        int remainingOneXOne = remainingTwoXTwo * 4;
-        while (remainingOneXOne > 0 && !plantsBySize[0].empty()) {
-            newBox.push_back(std::move(plantsBySize[0].back()));
-            plantsBySize[0].pop_back();
-            remainingOneXOne--;
+        while (row < 4 && !plantsBySize[0].empty()) {
+            for (int i = collum; i < collum + 2; i++) {
+                for (int j = row; j < row + 2; j++) {
+                    if (plantsBySize[0].empty()) break;
+                    newBox[i][j] = std::move(plantsBySize[0].back());
+                    plantsBySize[0].pop_back();
+                }
+                if (plantsBySize[0].empty()) break;
+            }
+            if (plantsBySize[0].empty()) break;
+            collum += 2;
+            if (collum == 4) {
+                collum = 0;
+                row += 2;
+            }
         }
 
         ret.push_back(Box(std::move(newBox)));
     }
 
     while (!plantsBySize[0].empty()) {
-        std::vector<std::unique_ptr<AbstractPlant>> newBox;
-        int remainingOneXOne = 16;
-        while (remainingOneXOne > 0 && !plantsBySize[0].empty()) {
-            newBox.push_back(std::move(plantsBySize[0].back()));
-            plantsBySize[0].pop_back();
-            remainingOneXOne--;
+        std::array<std::array<std::unique_ptr<AbstractPlant>, 4>, 4> newBox;
+        for (int i = 0; i < 4; i++) {
+            if (plantsBySize[0].empty()) break;
+            for (int j = 0; j < 4; j++) {
+                if (plantsBySize[0].empty()) break;
+                newBox[i][j] = std::move(plantsBySize[0].back());
+                plantsBySize[0].pop_back();
+            }
         }
 
         ret.push_back(Box(std::move(newBox)));

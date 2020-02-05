@@ -1,7 +1,14 @@
 This program takes a list of plants and retunes a png file of the packing.
+Sample input is available as sample.txt.
 
 Usage
 ./SquarePlant inputfile -o output.png
+
+Plants and colors
+Apple Tree is red
+Orange Tree is orange
+Grape Vine is purple
+Onions are brown
 
 Build commands
 mkdir Build
