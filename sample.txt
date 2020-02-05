@@ -1,4 +1,8 @@
-10 apple tree
-165 onion
-7 grape vine
-20 orange tree
+5 apple tree
+5 lime tree
+82 onion
+83 garlic
+3 grape vine
+4 berry bush
+10 orange tree
+10 lemon tree

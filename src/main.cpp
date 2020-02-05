@@ -20,7 +20,7 @@ constexpr std::array<png_byte, 3> BORADER_COLOR = {255, 255, 255};
 constexpr std::array<png_byte, 3> NOPLANT_COLOR = {0, 0, 0};
 
 void printUsage(const char* name) {
-    std::cerr << "Usage " << name << " [-o output] input" << std::endl;
+    std::cerr << "Usage " << name << " [-o output.png] input" << std::endl;
 }
 
 bool parseCommandLine(int argc, char **argv, std::string& inputName, std::string& outputName) {
@@ -101,18 +101,32 @@ std::optional<std::vector<SquarePlant::Box>> parseInputFile(const std::string& i
             std::cerr << "Lines must be in format \"[Number] [Plant Name]\"" << std::endl; 
             return {};
         }
-        else if (name.size() == 1 && name[0] == "onion") {
-            plantTemplate = std::make_unique<SquarePlant::Onion>();
+        else if (name.size() == 1) {
+            if (name[0] == "onion") {
+                plantTemplate = std::make_unique<SquarePlant::Onion>();
+            }
+            else if (name[0] == "garlic") {
+                plantTemplate = std::make_unique<SquarePlant::Garlic>();
+            }
         }
         else if (name.size() == 2) {
             if (name[0] == "grape" && name[1] == "vine") {
                 plantTemplate = std::make_unique<SquarePlant::GrapeVine>();
             }
-            if (name[0] == "orange" && name[1] == "tree") {
+            else if (name[0] == "berry" && name[1] == "bush") {
+                plantTemplate = std::make_unique<SquarePlant::BerryBush>();
+            }
+            else if (name[0] == "orange" && name[1] == "tree") {
                 plantTemplate = std::make_unique<SquarePlant::OrangeTree>();
             }
-            if (name[0] == "apple" && name[1] == "tree") {
+            else if (name[0] == "lemon" && name[1] == "tree") {
+                plantTemplate = std::make_unique<SquarePlant::LemonTree>();
+            }
+            else if (name[0] == "apple" && name[1] == "tree") {
                 plantTemplate = std::make_unique<SquarePlant::AppleTree>();
+            }
+            else if (name[0] == "lime" && name[1] == "tree") {
+                plantTemplate = std::make_unique<SquarePlant::LimeTree>();
             }
         }
 
@@ -228,45 +242,40 @@ int main(int argc, char **argv) {
     std::vector<SquarePlant::Box> boxes = std::move(*boxesOrNone);
 
     FILE *outputFile = fopen(outputName.c_str(), "wb");
+    png_byte** rows = nullptr;
+    int width, height;
+    png_struct* png = nullptr;
+    png_info* info = nullptr;
+
     if (!outputFile) {
-        perror("Output file could not open");
-        return 1;
+        perror("Output file could not be opened");
+        goto error;
     }
 
-    png_struct* png = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
+    png = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
     if (!png) {
         std::cerr << "png_create_write_struct failed" << std::endl;
-        return 1;
+        goto error;
     }
 
-    png_info* info = png_create_info_struct(png);
+    info = png_create_info_struct(png);
     if (!info) {
-        png_destroy_write_struct(&png, nullptr);
         std::cerr << "png_create_info_struct failed" << std::endl;
-        return 1;
+        goto error;
     }
 
     if (setjmp(png_jmpbuf(png))) {
-        png_destroy_write_struct(&png, &info);
-        fclose(outputFile);
         std::cerr << "Error during init_io" << std::endl;
-        return 1;
+        goto error;
     }
 
     png_init_io(png, outputFile);
 
-    int width, height;
-    png_byte** rows = genImage(boxes, width, height);
+    rows = genImage(boxes, width, height);
 
     if(setjmp(png_jmpbuf(png))) {
-        png_destroy_write_struct(&png, &info);
-        fclose(outputFile);
-        for (int i = 0; i < height; i++) {
-            delete[] rows[i];
-        }
-        delete rows;
         std::cerr << "Error while writing header" << std::endl;
-        return 1;
+        goto error;
     }
 
     png_set_IHDR(png, info, width, height, 8, 
@@ -276,14 +285,8 @@ int main(int argc, char **argv) {
     png_write_info(png, info);
 
     if (setjmp(png_jmpbuf(png))) {
-        png_destroy_write_struct(&png, &info);
-        fclose(outputFile);
-        for (int i = 0; i < height; i++) {
-            delete[] rows[i];
-        }
-        delete rows;
         std::cerr << "Error while writing image data" << std::endl;
-        return 1;
+        goto error;
     }
 
     png_write_image(png, rows);
@@ -292,12 +295,11 @@ int main(int argc, char **argv) {
         delete[] rows[i];
     }
     delete[] rows;
+    rows = nullptr;
 
     if (setjmp(png_jmpbuf(png))) {
-        png_destroy_write_struct(&png, &info);
-        fclose(outputFile);
         std::cerr << "Error while writing end" << std::endl;
-        return 1;
+        goto error;
     }
 
     png_write_end(png, nullptr);
@@ -306,4 +308,15 @@ int main(int argc, char **argv) {
     fclose(outputFile);
 
     std::cout << "You need " << boxes.size() << " boxes." << std::endl;
+    return 0;
+error:
+    png_destroy_write_struct(&png, &info);
+    fclose(outputFile);
+    if (rows) {
+        for (int i = 0; i < height; i++) {
+            delete[] rows[i];
+        }
+    }
+    delete rows;
+    return 1;
 }
