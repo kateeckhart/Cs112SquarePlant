@@ -1,0 +1,4 @@
+10 apple tree
+165 onion
+7 grape vine
+20 orange tree
