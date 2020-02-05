@@ -16,8 +16,8 @@
 #include <unistd.h>
 #include <png.h>
 
-constexpr std::array<png_byte, 3> BORADER_COLOR = {255, 255, 255};
-constexpr std::array<png_byte, 3> NOPLANT_COLOR = {0, 0, 0};
+constexpr png_color BOARDER_COLOR = {255, 255, 255};
+constexpr png_color NOPLANT_COLOR = {0, 0, 0};
 
 void printUsage(const char* name) {
     std::cerr << "Usage " << name << " [-o output.png] input" << std::endl;
@@ -144,52 +144,71 @@ std::optional<std::vector<SquarePlant::Box>> parseInputFile(const std::string& i
     return SquarePlant::Box::packPlants(std::move(plants));
 }
 
-void drawBox(const SquarePlant::Box& box, int widthOffset, png_byte** rows) {
+png_byte lookupPalette(const SquarePlant::Box& box, std::vector<png_color>& palette, int i, int j) {
+    png_byte plantColor;
+    SquarePlant::AbstractPlant* plant = box.getPlants()[(i - 10) / 10][j / 10].get();
+    if (plant) {
+        std::array<png_byte, 3> rawPlantColor = plant->getColor();
+        png_color pngPlantColor;
+        memcpy(&pngPlantColor, &rawPlantColor, sizeof(png_color));
+
+        bool colorFound = false;
+        for (unsigned i = 0; i < palette.size(); i++) {
+            if (memcmp(&pngPlantColor, &palette[i], sizeof(png_color)) == 0) {
+                plantColor = i;
+                colorFound = true;
+                break;
+            }
+        }
+        if (!colorFound) {
+            if (palette.size() >= 16) {
+                std::cerr << "Too many colors" << std::endl;
+                abort();
+            }
+            plantColor = palette.size();
+            palette.push_back(pngPlantColor);
+        }
+    }
+    else {
+        plantColor = 0;
+    }
+
+    return plantColor;
+}
+
+void drawBox(const SquarePlant::Box& box, int widthOffset, png_byte** rows, std::vector<png_color>& palette) {
     for (int i = 0; i < 10; i++) {
-        for (int j = widthOffset; j < (60 * 3) + widthOffset; j += 3) {
-            rows[i][j] = BORADER_COLOR[0];
-            rows[i][j + 1] = BORADER_COLOR[1];
-            rows[i][j + 2] = BORADER_COLOR[2];
+        for (int j = widthOffset; j < 60 / 2 + widthOffset; j++) {
+            rows[i][j] = 0x11; //0x11 sets two adjacent pixels to boarder
         }
     }
     for (int i = 10; i < 50; i++) {
-        for (int j = widthOffset; j < (10 * 3) + widthOffset; j += 3) {
-            rows[i][j] = BORADER_COLOR[0];
-            rows[i][j + 1] = BORADER_COLOR[1];
-            rows[i][j + 2] = BORADER_COLOR[2];
+        for (int j = widthOffset; j < 10 / 2 + widthOffset; j++) {
+            rows[i][j] = 0x11;
         }
 
-        for (int j = (10 * 3) + widthOffset; j < (50 * 3) + widthOffset; j += 3) {
-            SquarePlant::AbstractPlant* plant = box.getPlants()[(i - 10) / 10][(j - widthOffset - 30) / 30].get();
-            std::array<png_byte, 3> plantColor;
-            if (plant) {
-                plantColor = plant->getColor();
-            }
-            else {
-                plantColor = NOPLANT_COLOR;
-            }
-            rows[i][j] = plantColor[0];
-            rows[i][j + 1] = plantColor[1];
-            rows[i][j + 2] = plantColor[2];
+        for (int j = 10 / 2 + widthOffset; j < 50 / 2 + widthOffset; j++) {
+            png_byte plantColorOne = lookupPalette(box, palette, i, (j - widthOffset - 5) * 2);
+            png_byte plantColorTwo = lookupPalette(box, palette, i, (j - widthOffset - 5) * 2 + 1);
+            png_byte plantColor = plantColorOne << 4;
+            plantColor |= plantColorTwo;
+
+            rows[i][j] = plantColor;
         }
 
-        for (int j = (50 * 3) + widthOffset; j < (60 * 3) + widthOffset; j += 3) {
-            rows[i][j] = BORADER_COLOR[0];
-            rows[i][j + 1] = BORADER_COLOR[1];
-            rows[i][j + 2] = BORADER_COLOR[2];
+        for (int j = 50 / 2 + widthOffset; j < 60 / 2 + widthOffset; j++) {
+            rows[i][j] = 0x11;
         }
     }
     for (int i = 50; i < 60; i++) {
-        for (int j = widthOffset; j < (60 * 3) + widthOffset; j += 3) {
-            rows[i][j] = BORADER_COLOR[0];
-            rows[i][j + 1] = BORADER_COLOR[1];
-            rows[i][j + 2] = BORADER_COLOR[2];
+        for (int j = widthOffset; j < 60 / 2 + widthOffset; j ++) {
+            rows[i][j] = 0x11;
         }
     }
 
 }
 
-png_byte** genImage(const std::vector<SquarePlant::Box>& boxes, int& width, int& height) {
+png_byte** genImage(const std::vector<SquarePlant::Box>& boxes, int& width, int& height, std::vector<png_color>& palette) {
     int boxHCount = 1;
     int boxResetH = 0;
     int boxVCount = 1;
@@ -216,14 +235,16 @@ png_byte** genImage(const std::vector<SquarePlant::Box>& boxes, int& width, int&
 
     width = boxHCount * 60;
     height = boxVCount * 60;
+    palette.push_back(NOPLANT_COLOR);
+    palette.push_back(BOARDER_COLOR);
     png_byte** rows = new png_byte*[height];
     for (int i = 0; i < height; i++) {
-        rows[i] = new png_byte[width * 3];
-        memset(rows[i], 0, width * 3); // Set empty space to black.
+        rows[i] = new png_byte[width / 2];
+        memset(rows[i], 0, width / 2); // Set empty space to black.
     }
     boxCurrentH = boxCurrentV = 0;
     for (auto&& box: boxes) {
-        drawBox(box, boxCurrentH * 60 * 3, rows + (boxCurrentV * 60));
+        drawBox(box, boxCurrentH * 30, rows + (boxCurrentV * 60), palette);
         boxCurrentH++;
         if (boxCurrentH == boxHCount) {
             boxCurrentH = 0;
@@ -244,6 +265,7 @@ int main(int argc, char **argv) {
     FILE *outputFile = fopen(outputName.c_str(), "wb");
     png_byte** rows = nullptr;
     int width, height;
+    std::vector<png_color> palette;
     png_struct* png = nullptr;
     png_info* info = nullptr;
 
@@ -271,16 +293,22 @@ int main(int argc, char **argv) {
 
     png_init_io(png, outputFile);
 
-    rows = genImage(boxes, width, height);
+    rows = genImage(boxes, width, height, palette);
 
     if(setjmp(png_jmpbuf(png))) {
         std::cerr << "Error while writing header" << std::endl;
         goto error;
     }
 
-    png_set_IHDR(png, info, width, height, 8, 
-            PNG_COLOR_TYPE_RGB, PNG_INTERLACE_NONE, 
+    png_set_IHDR(png, info, width, height, 4, 
+            PNG_COLOR_TYPE_PALETTE, PNG_INTERLACE_NONE, 
             PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
+
+    png_set_PLTE(png, info, palette.data(), palette.size());
+
+    png_color_16 black;
+    black.index = 0;
+    png_set_bKGD(png, info, &black);
 
     png_write_info(png, info);
 
@@ -317,6 +345,6 @@ error:
             delete[] rows[i];
         }
     }
-    delete rows;
+    delete[] rows;
     return 1;
 }
